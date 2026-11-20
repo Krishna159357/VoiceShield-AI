@@ -1,30 +1,60 @@
 <!DOCTYPE html>
 <html lang="en">
-<head><meta charset="UTF-8"><title>VoiceShield AI — Step 1 Live Audio</title></head>
-<body style="font-family: system-ui; max-width: 600px; margin: 40px auto;">
-  <h2>VoiceShield AI — Live 16 kHz Stream Test</h2>
-  <button id="start">Start Live Mic</button>
-  <button id="stop" disabled>Stop</button>
-  <pre id="log">Idle...</pre>
+<head>
+  <meta charset="UTF-8">
+  <title>VoiceShield AI — Live Deepfake Detection</title>
+</head>
+<body style="font-family: system-ui; max-width: 640px; margin: 40px auto; line-height: 1.5;">
+  <h2>VoiceShield AI — Real-Time 16 kHz Detector</h2>
+  <button id="start" style="padding: 8px 16px; font-size: 15px;">Start Live Mic</button>
+  <button id="stop" disabled style="padding: 8px 16px; font-size: 15px;">Stop</button>
+
+  <h3 id="verdict" style="margin-top: 24px;">Status: Idle</h3>
+  <pre id="log" style="background: #f4f6f8; padding: 14px; border-radius: 6px;">Waiting to start...</pre>
+
   <script>
     let ws, ctx, stream;
     const log = document.getElementById("log");
+    const verdictEl = document.getElementById("verdict");
 
     document.getElementById("start").onclick = async () => {
       try {
         log.textContent = "1. Connecting WebSocket...";
         const proto = location.protocol === "https:" ? "wss" : "ws";
         ws = new WebSocket(`${proto}://${location.host}/ws/audio`);
-        ws.onopen = () => { log.textContent = "2. WebSocket connected! Requesting mic..."; };
+
+        ws.onopen = () => { log.textContent = "2. WebSocket connected! Requesting clean mic..."; };
         ws.onerror = () => { log.textContent = "ERROR: WebSocket failed to connect."; };
-        ws.onmessage = (e) => { log.textContent = "LIVE: " + e.data; };
+        ws.onmessage = (e) => {
+          const data = JSON.parse(e.data);
+          log.textContent = JSON.stringify(data, null, 2);
 
+          if (data.verdict === "HIGH_RISK_FAKE") {
+            verdictEl.textContent = `Status: HIGH RISK FAKE (p_fake = ${data.p_fake})`;
+            verdictEl.style.color = "#b91c1c";
+          } else if (data.verdict === "SUSPICIOUS") {
+            verdictEl.textContent = `Status: SUSPICIOUS (p_fake = ${data.p_fake})`;
+            verdictEl.style.color = "#b45309";
+          } else if (data.verdict === "LIKELY_REAL") {
+            verdictEl.textContent = `Status: LIKELY REAL (p_fake = ${data.p_fake})`;
+            verdictEl.style.color = "#047857";
+          } else {
+            verdictEl.textContent = "Status: Silence / Waiting for Speech";
+            verdictEl.style.color = "#475569";
+          }
+        };
+
+        // Clean raw mic audio (no synthetic browser noise-suppression artifacts)
         stream = await navigator.mediaDevices.getUserMedia({
-          audio: { echoCancellation: true, noiseSuppression: true }
+          audio: {
+            echoCancellation: false,
+            noiseSuppression: false,
+            autoGainControl: false
+          }
         });
-        log.textContent = "3. Mic granted! Loading AudioWorklet...";
 
-        ctx = new AudioContext();
+        // Native anti-aliased 16 kHz resampling inside Chrome
+        ctx = new AudioContext({ sampleRate: 16000 });
         await ctx.resume();
         await ctx.audioWorklet.addModule("/pcm-processor.js");
 
@@ -37,16 +67,20 @@
 
         document.getElementById("start").disabled = true;
         document.getElementById("stop").disabled = false;
-        log.textContent = "4. Streaming live 16 kHz audio... speak for 2 seconds!";
+        log.textContent = "3. Streaming clean 16 kHz audio... speak for 2 seconds!";
       } catch (err) {
         log.textContent = "ERROR: " + err.name + " - " + err.message;
       }
     };
 
     document.getElementById("stop").onclick = () => {
-      ws?.close(); ctx?.close(); stream?.getTracks().forEach(t => t.stop());
+      ws?.close();
+      ctx?.close();
+      stream?.getTracks().forEach(t => t.stop());
       document.getElementById("start").disabled = false;
       document.getElementById("stop").disabled = true;
+      verdictEl.textContent = "Status: Stopped";
+      verdictEl.style.color = "#0f172a";
       log.textContent = "Stopped.";
     };
   </script>

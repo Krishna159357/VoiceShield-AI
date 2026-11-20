@@ -1,8 +1,10 @@
+import asyncio
 from collections import deque
 from pathlib import Path
 import numpy as np
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.staticfiles import StaticFiles
+from backend.deepfake_model import analyze_window
 
 app = FastAPI()
 SAMPLE_RATE = 16000
@@ -13,6 +15,18 @@ async def audio_stream(ws: WebSocket):
     await ws.accept()
     ring_buffer = deque(maxlen=WINDOW_SAMPLES)
     chunks_since_eval = 0
+    is_processing = False
+
+    async def run_inference(window_np: np.ndarray):
+        nonlocal is_processing
+        try:
+            result = await asyncio.to_thread(analyze_window, window_np)
+            print(f"[AI] {result}", flush=True)
+            await ws.send_json(result)
+        except Exception as e:
+            print(f"[AI ERROR] {e}", flush=True)
+        finally:
+            is_processing = False
 
     try:
         while True:
@@ -21,19 +35,14 @@ async def audio_stream(ws: WebSocket):
             ring_buffer.extend(pcm_float)
             chunks_since_eval += 1
 
-            # Evaluate every 0.5s (5 chunks of 100ms) once 2.0s buffer is full
-            if len(ring_buffer) == WINDOW_SAMPLES and chunks_since_eval >= 5:
+            # Evaluate every 1.0s (10 chunks of 100ms) without piling up slow frames
+            if len(ring_buffer) == WINDOW_SAMPLES and chunks_since_eval >= 10 and not is_processing:
                 chunks_since_eval = 0
+                is_processing = True
                 window = np.array(ring_buffer, dtype=np.float32)
-                rms = float(np.sqrt(np.mean(window ** 2)))
-                print(f"[LIVE 16kHz] window=2.0s | rms={rms:.4f}")
-                await ws.send_json({
-                    "buffer_ready": True,
-                    "rms": round(rms, 4),
-                    "status": "SPEECH_DETECTED" if rms > 0.01 else "SILENCE"
-                })
+                asyncio.create_task(run_inference(window))
     except WebSocketDisconnect:
-        print("Caller disconnected cleanly.")
+        print("Caller disconnected cleanly.", flush=True)
 
 FRONTEND_DIR = Path(__file__).resolve().parent.parent / "frontend"
 app.mount("/", StaticFiles(directory=str(FRONTEND_DIR), html=True), name="frontend")
