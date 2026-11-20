@@ -1,0 +1,6 @@
+.venv/
+__pycache__/
+*.pyc
+enrolled_voices/*.wav
+*.db
+.env

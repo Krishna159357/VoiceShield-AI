@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8"><title>VoiceShield AI — Step 1 Live Audio</title></head>
+<body style="font-family: system-ui; max-width: 600px; margin: 40px auto;">
+  <h2>VoiceShield AI — Live 16 kHz Stream Test</h2>
+  <button id="start">Start Live Mic</button>
+  <button id="stop" disabled>Stop</button>
+  <pre id="log">Idle...</pre>
+  <script>
+    let ws, ctx, stream;
+    const log = document.getElementById("log");
+
+    document.getElementById("start").onclick = async () => {
+      try {
+        log.textContent = "1. Connecting WebSocket...";
+        const proto = location.protocol === "https:" ? "wss" : "ws";
+        ws = new WebSocket(`${proto}://${location.host}/ws/audio`);
+        ws.onopen = () => { log.textContent = "2. WebSocket connected! Requesting mic..."; };
+        ws.onerror = () => { log.textContent = "ERROR: WebSocket failed to connect."; };
+        ws.onmessage = (e) => { log.textContent = "LIVE: " + e.data; };
+
+        stream = await navigator.mediaDevices.getUserMedia({
+          audio: { echoCancellation: true, noiseSuppression: true }
+        });
+        log.textContent = "3. Mic granted! Loading AudioWorklet...";
+
+        ctx = new AudioContext();
+        await ctx.resume();
+        await ctx.audioWorklet.addModule("/pcm-processor.js");
+
+        const src = ctx.createMediaStreamSource(stream);
+        const node = new AudioWorkletNode(ctx, "pcm16-processor");
+        node.port.onmessage = (e) => {
+          if (ws.readyState === WebSocket.OPEN) ws.send(e.data);
+        };
+        src.connect(node);
+
+        document.getElementById("start").disabled = true;
+        document.getElementById("stop").disabled = false;
+        log.textContent = "4. Streaming live 16 kHz audio... speak for 2 seconds!";
+      } catch (err) {
+        log.textContent = "ERROR: " + err.name + " - " + err.message;
+      }
+    };
+
+    document.getElementById("stop").onclick = () => {
+      ws?.close(); ctx?.close(); stream?.getTracks().forEach(t => t.stop());
+      document.getElementById("start").disabled = false;
+      document.getElementById("stop").disabled = true;
+      log.textContent = "Stopped.";
+    };
+  </script>
+</body>
+</html>
