@@ -173,15 +173,4 @@ voiceshield-ai/
 
 ```
 
----
-
-Push your updated visual `README.md` right now:
-
-```powershell
-git add README.md requirements.txt
-git commit -m "docs: add visual README with Mermaid architecture diagrams, badges, and accuracy scorecard"
-git push
-
-```
-
 Refresh [your GitHub repo](https://github.com/Krishna159357/VoiceShield-AI) after pushing—both Mermaid diagrams, the badges, and the accuracy bars will render live right on your homepage!
