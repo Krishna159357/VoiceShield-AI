@@ -4,3 +4,5 @@ __pycache__/
 enrolled_voices/*.wav
 *.db
 .env
+pretrained_models/
+enrolled_voices/

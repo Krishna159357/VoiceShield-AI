@@ -1,10 +1,10 @@
-from collections import deque
 import numpy as np
 import torch
 from silero_vad import load_silero_vad, get_speech_timestamps
 from transformers import AutoFeatureExtractor, AutoModelForAudioClassification
 
-MODEL_ID = "Vansh180/deepfake-audio-wav2vec2"
+# Multilingual XLS-R-300M model trained for real vs. synthetic deepfake speech
+MODEL_ID = "Gustking/wav2vec2-large-xlsr-deepfake-audio-classification"
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
 print(f"[VoiceShield] Loading Silero VAD & {MODEL_ID} on {DEVICE}...", flush=True)
@@ -19,8 +19,6 @@ FAKE_IDX = next(
     1,
 )
 
-recent_scores = deque(maxlen=3)
-
 @torch.inference_mode()
 def extract_clean_speech(audio_16k: np.ndarray) -> tuple[np.ndarray | None, float]:
     wav_tensor = torch.from_numpy(audio_16k).float()
@@ -30,10 +28,9 @@ def extract_clean_speech(audio_16k: np.ndarray) -> tuple[np.ndarray | None, floa
 
     speech_only = np.concatenate([audio_16k[t["start"]:t["end"]] for t in speech_ts])
     speech_ratio = len(speech_only) / max(1, len(audio_16k))
-    if len(speech_only) < 9600:  # Need at least 0.6s of real speech
+    if len(speech_only) < 8000:  # Need at least 0.5s of clean speech
         return None, round(speech_ratio, 2)
 
-    # Remove DC offset & peak-normalize cleanly
     speech_only = speech_only - float(np.mean(speech_only))
     peak = float(np.max(np.abs(speech_only)))
     if peak > 1e-4:
@@ -48,7 +45,4 @@ def score_deepfake(speech_16k: np.ndarray) -> dict:
     logits = df_model(**inputs).logits
     probs = torch.softmax(logits, dim=-1)[0]
     raw_fake = float(probs[FAKE_IDX].item())
-
-    recent_scores.append(raw_fake)
-    smoothed_fake = float(sum(recent_scores) / len(recent_scores))
-    return {"p_fake": round(smoothed_fake, 4), "raw_p_fake": round(raw_fake, 4)}
+    return {"p_fake": round(raw_fake, 4)}

@@ -2,87 +2,577 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>VoiceShield AI — Live Deepfake Detection</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VoiceShield AI — Real-Time Voice Anti-Spoofing SOC</title>
+  <style>
+    :root {
+      --bg: #0b1120; --panel: #111827; --border: #1f2937;
+      --text: #f8fafc; --muted: #94a3b8; --blue: #3b82f6;
+      --green: #10b981; --amber: #f59e0b; --red: #ef4444;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      background: radial-gradient(circle at top, #172554 0%, var(--bg) 48%);
+      color: var(--text); min-height: 100vh; padding: 28px 20px;
+    }
+    .container { max-width: 1080px; margin: 0 auto; }
+    header {
+      display: flex; justify-content: space-between; align-items: center;
+      padding-bottom: 20px; border-bottom: 1px solid var(--border); margin-bottom: 24px;
+      flex-wrap: wrap; gap: 12px;
+    }
+    .brand h1 { font-size: 26px; letter-spacing: -0.02em; }
+    .brand p { color: var(--muted); font-size: 13px; margin-top: 4px; }
+    .pill {
+      padding: 6px 12px; border-radius: 999px; font-size: 12px; font-weight: 600;
+      background: rgba(59,130,246,0.15); color: #93c5fd; border: 1px solid rgba(59,130,246,0.35);
+    }
+    .grid { display: grid; grid-template-columns: 360px 1fr; gap: 22px; }
+    @media (max-width: 860px) { .grid { grid-template-columns: 1fr; } }
+    .card {
+      background: rgba(17, 24, 39, 0.88); border: 1px solid var(--border);
+      border-radius: 14px; padding: 20px; backdrop-filter: blur(8px);
+    }
+    .card h2 { font-size: 16px; margin-bottom: 6px; }
+    .sub { font-size: 13px; color: var(--muted); margin-bottom: 16px; }
+    label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 6px; font-weight: 600; }
+    input, select {
+      width: 100%; padding: 10px 12px; border-radius: 8px; border: 1px solid #334155;
+      background: #0f172a; color: var(--text); font-size: 14px; margin-bottom: 12px;
+    }
+    button {
+      padding: 10px 16px; border-radius: 8px; border: none; font-size: 14px;
+      font-weight: 600; cursor: pointer; transition: opacity 0.15s;
+    }
+    button:disabled { opacity: 0.45; cursor: not-allowed; }
+    .btn-primary { background: var(--blue); color: #fff; width: 100%; }
+    .btn-secondary { background: #334155; color: #fff; width: 100%; }
+    .btn-green { background: var(--green); color: #052e16; }
+    .btn-red { background: var(--red); color: #fff; }
+    .btn-sm { padding: 4px 9px; font-size: 12px; background: #1f2937; color: #fca5a5; }
+    .progress-bg {
+      height: 8px; background: #1e293b; border-radius: 999px; overflow: hidden; margin: 12px 0;
+    }
+    .progress-fill { height: 100%; width: 0%; background: var(--blue); transition: width 0.1s linear; }
+    .user-list { margin-top: 12px; display: flex; flex-direction: column; gap: 8px; }
+    .user-item {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 9px 12px; background: #0f172a; border: 1px solid #1e293b; border-radius: 8px; font-size: 13px;
+    }
+    .user-badge { color: #34d399; font-size: 11px; font-family: monospace; margin-left: 6px; }
+    .controls { display: flex; gap: 10px; align-items: center; margin-bottom: 18px; flex-wrap: wrap; }
+    .controls select { width: auto; min-width: 190px; margin-bottom: 0; }
+    canvas {
+      width: 100%; height: 90px; background: #020617; border: 1px solid #1e293b;
+      border-radius: 10px; margin-bottom: 18px; display: block;
+    }
+    .banner {
+      padding: 16px; border-radius: 10px; margin-bottom: 18px;
+      border: 1px solid #334155; background: #0f172a;
+      display: flex; justify-content: space-between; align-items: center; gap: 12px;
+    }
+    .banner-title { font-size: 18px; font-weight: 700; }
+    .banner-sub { font-size: 13px; color: var(--muted); margin-top: 3px; }
+    .score-big { font-size: 28px; font-weight: 800; font-family: monospace; white-space: nowrap; }
+    .metrics { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 16px; }
+    .metric {
+      background: #0f172a; border: 1px solid #1e293b; border-radius: 10px; padding: 12px;
+    }
+    .metric-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+    .metric-val { font-size: 20px; font-weight: 700; font-family: monospace; margin-top: 4px; }
+    .log-box {
+      background: #020617; border: 1px solid #1e293b; border-radius: 10px;
+      padding: 12px; font-family: monospace; font-size: 12px; color: #cbd5e1;
+      max-height: 160px; overflow-y: auto; white-space: pre-wrap;
+    }
+  </style>
 </head>
-<body style="font-family: system-ui; max-width: 640px; margin: 40px auto; line-height: 1.5;">
-  <h2>VoiceShield AI — Real-Time 16 kHz Detector</h2>
-  <button id="start" style="padding: 8px 16px; font-size: 15px;">Start Live Mic</button>
-  <button id="stop" disabled style="padding: 8px 16px; font-size: 15px;">Stop</button>
+<body>
+<div class="container">
+  <header>
+    <div class="brand">
+      <h1>VoiceShield AI</h1>
+      <p>Team SHRESTH &middot; Real-Time Voice Cloning Detection &amp; Prevention</p>
+    </div>
+    <span class="pill">Privacy-First: Embeddings Only</span>
+  </header>
 
-  <h3 id="verdict" style="margin-top: 24px;">Status: Idle</h3>
-  <pre id="log" style="background: #f4f6f8; padding: 14px; border-radius: 6px;">Waiting to start...</pre>
+  <div class="grid">
+    <!-- LEFT: CUSTOM ENROLLMENT (LIVE MIC + FILE UPLOAD) -->
+    <section class="card">
+      <h2>Voiceprint Enrollment</h2>
+      <p class="sub">Add a genuine user via mic or audio file. Only a 192-dim math vector is saved&mdash;zero raw audio is stored.</p>
 
-  <script>
-    let ws, ctx, stream;
-    const log = document.getElementById("log");
-    const verdictEl = document.getElementById("verdict");
+      <label for="speakerName">User Name / Role</label>
+      <input id="speakerName" type="text" placeholder="e.g. Shrwan_CEO or Judge_1">
+      <button id="enrollBtn" class="btn-primary">Record &amp; Enroll Live (5 sec)</button>
 
-    document.getElementById("start").onclick = async () => {
-      try {
-        log.textContent = "1. Connecting WebSocket...";
-        const proto = location.protocol === "https:" ? "wss" : "ws";
-        ws = new WebSocket(`${proto}://${location.host}/ws/audio`);
+      <div class="progress-bg"><div id="enrollBar" class="progress-fill"></div></div>
+      <div id="enrollMsg" class="sub" style="margin-bottom: 0;">Ready to enroll a new speaker.</div>
 
-        ws.onopen = () => { log.textContent = "2. WebSocket connected! Requesting clean mic..."; };
-        ws.onerror = () => { log.textContent = "ERROR: WebSocket failed to connect."; };
-        ws.onmessage = (e) => {
-          const data = JSON.parse(e.data);
-          log.textContent = JSON.stringify(data, null, 2);
+      <div style="margin-top: 16px; padding-top: 14px; border-top: 1px solid #1f2937;">
+        <label for="enrollFile">Or Enroll From Audio File (.wav / .mp3)</label>
+        <input id="enrollFile" type="file" accept="audio/*" style="padding: 7px;">
+        <button id="enrollFileBtn" class="btn-secondary">Upload &amp; Enroll User</button>
+      </div>
 
-          if (data.verdict === "HIGH_RISK_FAKE") {
-            verdictEl.textContent = `Status: HIGH RISK FAKE (p_fake = ${data.p_fake})`;
-            verdictEl.style.color = "#b91c1c";
-          } else if (data.verdict === "SUSPICIOUS") {
-            verdictEl.textContent = `Status: SUSPICIOUS (p_fake = ${data.p_fake})`;
-            verdictEl.style.color = "#b45309";
-          } else if (data.verdict === "LIKELY_REAL") {
-            verdictEl.textContent = `Status: LIKELY REAL (p_fake = ${data.p_fake})`;
-            verdictEl.style.color = "#047857";
-          } else {
-            verdictEl.textContent = "Status: Silence / Waiting for Speech";
-            verdictEl.style.color = "#475569";
-          }
-        };
+      <div style="margin-top: 18px;">
+        <label>Enrolled Voiceprints</label>
+        <div id="userList" class="user-list"></div>
+      </div>
+    </section>
 
-        // Clean raw mic audio (no synthetic browser noise-suppression artifacts)
-        stream = await navigator.mediaDevices.getUserMedia({
-          audio: {
-            echoCancellation: false,
-            noiseSuppression: false,
-            autoGainControl: false
-          }
+    <!-- RIGHT: LIVE CALL MONITOR -->
+    <section class="card">
+      <h2>Live Call Protection</h2>
+      <p class="sub">Select the claimed caller identity and start live 16 kHz real-time inspection.</p>
+
+      <div class="controls">
+        <select id="speakerSelect"></select>
+        <button id="startBtn" class="btn-green">Start Live Call</button>
+        <button id="stopBtn" class="btn-red" disabled>End Call</button>
+      </div>
+
+      <canvas id="wave" width="640" height="90"></canvas>
+
+      <div id="banner" class="banner">
+        <div>
+          <div id="bannerTitle" class="banner-title">Idle &mdash; Waiting for Call</div>
+          <div id="bannerSub" class="banner-sub">Enroll a voice or click Start Live Call to begin monitoring.</div>
+        </div>
+        <div id="riskScore" class="score-big">--</div>
+      </div>
+
+      <div class="metrics">
+        <div class="metric">
+          <div class="metric-label">Deepfake AI Prob</div>
+          <div id="mFake" class="metric-val">--</div>
+        </div>
+        <div class="metric">
+          <div class="metric-label">Speaker Match</div>
+          <div id="mMatch" class="metric-val">--</div>
+        </div>
+        <div class="metric">
+          <div class="metric-label">Action Taken</div>
+          <div id="mAction" class="metric-val">IDLE</div>
+        </div>
+      </div>
+
+      <div id="logBox" class="log-box">System ready.</div>
+    </section>
+  </div>
+
+  <!-- MIDDLE: AI VS REAL VOICE FORENSIC SCANNER -->
+  <section class="card" style="margin-top: 22px;">
+    <h2>AI vs. Real Voice Forensic Scanner</h2>
+    <p class="sub">Upload any suspicious voicemail, call recording, or voice note to detect whether it is AI-generated or a real human voice.</p>
+    <div style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
+      <input id="scanFile" type="file" accept="audio/*" style="width: auto; flex: 1; margin-bottom: 0; padding: 8px;">
+      <button id="scanBtn" class="btn-primary" style="width: auto; padding: 10px 20px;">Scan Audio (AI vs. Real)</button>
+    </div>
+  <div style="display: flex; gap: 10px; align-items: center; margin-top: 12px; flex-wrap: wrap;">
+      <button id="recStartBtn" class="btn-green" style="padding: 9px 16px;">Record Live Voice</button>
+      <button id="recStopBtn" class="btn-red" style="padding: 9px 16px;" disabled>Stop &amp; Scan</button>
+      <span id="recTimer" class="pill" style="font-family: monospace; font-size: 13px;">00:00</span>
+    </div>
+    <div id="scanResult" class="banner" style="margin-top: 16px; margin-bottom: 0; display: none;">
+      <div>
+        <div id="scanVerdict" class="banner-title">--</div>
+        <div id="scanDetails" class="banner-sub">--</div>
+      </div>
+      <div id="scanScore" class="score-big">--</div>
+    </div>
+  </section>
+
+  <!-- BOTTOM: TAMPER-EVIDENT HASH-CHAINED AUDIT LEDGER -->
+  <section class="card" style="margin-top: 22px;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 10px;">
+      <div>
+        <h2>Tamper-Evident Security Audit Ledger (SHA-256 Chain)</h2>
+        <p class="sub" style="margin-bottom: 0;">Metadata-only blocks &mdash; zero call audio stored. Each alert is cryptographically linked to the previous block.</p>
+      </div>
+      <div style="display: flex; gap: 10px; align-items: center;">
+        <span id="chainBadge" class="pill">Checking chain...</span>
+        <button id="verifyBtn" class="btn-green" style="padding: 7px 14px; font-size: 13px;">Verify Ledger Integrity</button>
+      </div>
+    </div>
+    <div id="auditList" class="log-box" style="max-height: 180px;">No alerts logged yet.</div>
+  </section>
+</div>
+
+<script>
+  let ws, ctx, stream, animId;
+  const userList = document.getElementById("userList");
+  const speakerSelect = document.getElementById("speakerSelect");
+  const logBox = document.getElementById("logBox");
+  const canvas = document.getElementById("wave");
+  const g = canvas.getContext("2d");
+
+  function appendLog(msg) {
+    const ts = new Date().toLocaleTimeString();
+    logBox.textContent = `[${ts}] ${msg}\n` + logBox.textContent;
+  }
+
+  async function refreshSpeakers() {
+    const res = await fetch("/api/speakers");
+    const { speakers } = await res.json();
+    speakerSelect.innerHTML = speakers.length
+      ? speakers.map(s => `<option value="${s}">Claimed Caller: ${s}</option>`).join("")
+      : `<option value="ceo">No user enrolled yet</option>`;
+
+    userList.innerHTML = speakers.length
+      ? speakers.map(s => `
+          <div class="user-item">
+            <span><strong>${s}</strong><span class="user-badge">192-dim .npy</span></span>
+            <button class="btn-sm" onclick="removeSpeaker('${s}')">Delete</button>
+          </div>`).join("")
+      : `<div class="sub" style="margin-bottom:0;">No enrolled users yet.</div>`;
+  }
+
+  window.removeSpeaker = async (id) => {
+    await fetch(`/api/speakers/${encodeURIComponent(id)}`, { method: "DELETE" });
+    appendLog(`Deleted voiceprint: ${id}`);
+    refreshSpeakers();
+  };
+
+  // 1. Live 5-Second Mic Enrollment
+  document.getElementById("enrollBtn").onclick = async () => {
+    const name = document.getElementById("speakerName").value.trim();
+    if (!name) { alert("Please enter a user name first!"); return; }
+
+    const btn = document.getElementById("enrollBtn");
+    const bar = document.getElementById("enrollBar");
+    const msg = document.getElementById("enrollMsg");
+    btn.disabled = true;
+
+    try {
+      const s = await navigator.mediaDevices.getUserMedia({
+        audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false }
+      });
+      const c = new AudioContext({ sampleRate: 16000 });
+      await c.resume();
+      await c.audioWorklet.addModule("/pcm-processor.js");
+      const src = c.createMediaStreamSource(s);
+      const node = new AudioWorkletNode(c, "pcm16-processor");
+
+      const chunks = [];
+      node.port.onmessage = (e) => chunks.push(new Int16Array(e.data));
+      src.connect(node);
+
+      msg.textContent = `Recording "${name}" — speak naturally for 5 seconds...`;
+      let elapsed = 0;
+      const timer = setInterval(() => {
+        elapsed += 100;
+        bar.style.width = `${Math.min(100, (elapsed / 5000) * 100)}%`;
+      }, 100);
+
+      setTimeout(async () => {
+        clearInterval(timer);
+        bar.style.width = "100%";
+        c.close();
+        s.getTracks().forEach(t => t.stop());
+
+        const total = chunks.reduce((a, b) => a + b.length, 0);
+        const merged = new Int16Array(total);
+        let offset = 0;
+        for (const ch of chunks) { merged.set(ch, offset); offset += ch.length; }
+
+        msg.textContent = "Extracting 192-dim ECAPA-TDNN voiceprint...";
+        const res = await fetch(`/api/enroll?name=${encodeURIComponent(name)}`, {
+          method: "POST", body: merged.buffer
         });
+        const data = await res.json();
+        msg.textContent = `Enrolled "${data.speaker_id}" (${data.embedding_dim}-dim vector saved, raw audio discarded).`;
+        document.getElementById("speakerName").value = "";
+        appendLog(`Enrolled speaker live: ${data.speaker_id}`);
+        await refreshSpeakers();
+        speakerSelect.value = data.speaker_id;
+        btn.disabled = false;
+        setTimeout(() => { bar.style.width = "0%"; }, 800);
+      }, 5000);
+    } catch (err) {
+      msg.textContent = "Enrollment error: " + err.message;
+      btn.disabled = false;
+    }
+  };
 
-        // Native anti-aliased 16 kHz resampling inside Chrome
-        ctx = new AudioContext({ sampleRate: 16000 });
-        await ctx.resume();
-        await ctx.audioWorklet.addModule("/pcm-processor.js");
+  // 2. File-Upload User Enrollment
+  document.getElementById("enrollFileBtn").onclick = async () => {
+    const name = document.getElementById("speakerName").value.trim();
+    const file = document.getElementById("enrollFile").files[0];
+    const msg = document.getElementById("enrollMsg");
+    if (!name || !file) { alert("Enter a user name and choose an audio file first!"); return; }
 
-        const src = ctx.createMediaStreamSource(stream);
-        const node = new AudioWorkletNode(ctx, "pcm16-processor");
-        node.port.onmessage = (e) => {
-          if (ws.readyState === WebSocket.OPEN) ws.send(e.data);
-        };
-        src.connect(node);
+    const btn = document.getElementById("enrollFileBtn");
+    btn.disabled = true;
+    msg.textContent = `Processing "${file.name}" for ${name}...`;
+    try {
+      const fd = new FormData();
+      fd.append("name", name);
+      fd.append("file", file);
+      const res = await fetch("/api/enroll-file", { method: "POST", body: fd });
+      const data = await res.json();
+      msg.textContent = `Enrolled "${data.speaker_id}" from file (${data.embedding_dim}-dim vector saved, raw audio deleted).`;
+      document.getElementById("speakerName").value = "";
+      document.getElementById("enrollFile").value = "";
+      appendLog(`Enrolled speaker from file: ${data.speaker_id}`);
+      await refreshSpeakers();
+      speakerSelect.value = data.speaker_id;
+    } catch (err) {
+      msg.textContent = "File enrollment error: " + err.message;
+    } finally {
+      btn.disabled = false;
+    }
+  };
 
-        document.getElementById("start").disabled = true;
-        document.getElementById("stop").disabled = false;
-        log.textContent = "3. Streaming clean 16 kHz audio... speak for 2 seconds!";
-      } catch (err) {
-        log.textContent = "ERROR: " + err.name + " - " + err.message;
+  // 3. Live Call Protection + Waveform
+  function drawWave(analyser) {
+    const data = new Uint8Array(analyser.fftSize);
+    function loop() {
+      animId = requestAnimationFrame(loop);
+      analyser.getByteTimeDomainData(data);
+      g.fillStyle = "#020617";
+      g.fillRect(0, 0, canvas.width, canvas.height);
+      g.strokeStyle = "#3b82f6";
+      g.lineWidth = 2;
+      g.beginPath();
+      const slice = canvas.width / data.length;
+      for (let i = 0; i < data.length; i++) {
+        const y = (data[i] / 128.0) * (canvas.height / 2);
+        i === 0 ? g.moveTo(0, y) : g.lineTo(i * slice, y);
+      }
+      g.stroke();
+    }
+    loop();
+  }
+
+  function updateBanner(title, sub, score, color) {
+    document.getElementById("bannerTitle").textContent = title;
+    document.getElementById("bannerSub").textContent = sub;
+    document.getElementById("riskScore").textContent = score;
+    document.getElementById("banner").style.borderColor = color;
+    document.getElementById("bannerTitle").style.color = color;
+    document.getElementById("riskScore").style.color = color;
+  }
+
+  function stopCall(reason) {
+    ws?.close(); ctx?.close();
+    stream?.getTracks().forEach(t => t.stop());
+    cancelAnimationFrame(animId);
+    document.getElementById("startBtn").disabled = false;
+    document.getElementById("stopBtn").disabled = true;
+    if (reason) appendLog(reason);
+  }
+
+  document.getElementById("startBtn").onclick = async () => {
+    const sid = speakerSelect.value;
+    const proto = location.protocol === "https:" ? "wss" : "ws";
+    ws = new WebSocket(`${proto}://${location.host}/ws/audio?speaker_id=${encodeURIComponent(sid)}`);
+
+    ws.onmessage = (e) => {
+      const d = JSON.parse(e.data);
+      document.getElementById("mFake").textContent = d.p_fake !== null ? `${(d.p_fake * 100).toFixed(1)}%` : "--";
+      document.getElementById("mMatch").textContent = d.speaker_match !== null ? d.speaker_match.toFixed(2) : "N/A";
+      document.getElementById("mAction").textContent = d.action;
+
+      if (d.action === "BLOCK") {
+        updateBanner("CALL BLOCKED — Synthetic Voice Attack", `Terminated live audio stream for claimed caller "${sid}".`, d.risk_score, "#ef4444");
+        stopCall(`AUTO-BLOCKED call (risk=${d.risk_score}, p_fake=${d.p_fake}, match=${d.speaker_match})`);
+        refreshAudit();
+      } else if (d.action === "VERIFY_MFA") {
+        updateBanner("MEDIUM RISK — MFA Alert Sent", "Suspicious voice detected. Out-of-band Telegram OTP triggered.", d.risk_score, "#f59e0b");
+        refreshAudit();
+      } else if (d.action === "WARN") {
+        updateBanner("LOW RISK — Unverified Caller Warning", "Voice does not strongly match enrolled speaker.", d.risk_score, "#3b82f6");
+      } else if (d.action === "ALLOW") {
+        updateBanner("SAFE — Genuine Speaker Verified", `Confirmed live voice match for "${sid}".`, d.risk_score, "#10b981");
+      } else {
+        updateBanner("Listening — Waiting for Speech", "Silero VAD active (ignoring background silence).", "--", "#94a3b8");
       }
     };
 
-    document.getElementById("stop").onclick = () => {
-      ws?.close();
-      ctx?.close();
-      stream?.getTracks().forEach(t => t.stop());
-      document.getElementById("start").disabled = false;
-      document.getElementById("stop").disabled = true;
-      verdictEl.textContent = "Status: Stopped";
-      verdictEl.style.color = "#0f172a";
-      log.textContent = "Stopped.";
-    };
-  </script>
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({
+        audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false }
+      });
+      ctx = new AudioContext({ sampleRate: 16000 });
+      await ctx.resume();
+      await ctx.audioWorklet.addModule("/pcm-processor.js");
+
+      const src = ctx.createMediaStreamSource(stream);
+      const analyser = ctx.createAnalyser();
+      analyser.fftSize = 1024;
+      const node = new AudioWorkletNode(ctx, "pcm16-processor");
+      node.port.onmessage = (e) => { if (ws.readyState === WebSocket.OPEN) ws.send(e.data); };
+
+      src.connect(analyser);
+      src.connect(node);
+      drawWave(analyser);
+
+      document.getElementById("startBtn").disabled = true;
+      document.getElementById("stopBtn").disabled = false;
+      updateBanner("Live Call Active", `Monitoring claimed caller "${sid}" in real time...`, "--", "#3b82f6");
+      appendLog(`Started live call monitoring against enrolled speaker: ${sid}`);
+    } catch (err) {
+      appendLog("MIC ERROR: " + err.message);
+    }
+  };
+
+  document.getElementById("stopBtn").onclick = () => {
+    stopCall("Call ended manually.");
+    updateBanner("Call Ended", "Click Start Live Call to monitor a new session.", "--", "#94a3b8");
+  };
+
+  // 4. AI vs. Real Voice Forensic File Scanner
+  document.getElementById("scanBtn").onclick = async () => {
+    const file = document.getElementById("scanFile").files[0];
+    if (!file) { alert("Please select an audio file to scan!"); return; }
+
+    const btn = document.getElementById("scanBtn");
+    const box = document.getElementById("scanResult");
+    const verdict = document.getElementById("scanVerdict");
+    const details = document.getElementById("scanDetails");
+    const score = document.getElementById("scanScore");
+
+    btn.disabled = true;
+    btn.textContent = "Scanning...";
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const res = await fetch("/api/analyze-file", { method: "POST", body: fd });
+      const d = await res.json();
+      box.style.display = "flex";
+      const color = d.verdict.includes("AI") ? "#ef4444" : (d.verdict.includes("SUSPICIOUS") ? "#f59e0b" : "#10b981");
+      box.style.borderColor = color;
+      verdict.style.color = color;
+      score.style.color = color;
+      verdict.textContent = d.verdict;
+      score.textContent = `${(d.p_fake_avg * 100).toFixed(1)}% AI`;
+      const spkInfo = d.closest_speaker ? ` | Closest Enrolled: ${d.closest_speaker} (match=${d.speaker_match})` : "";
+      details.textContent = `Duration: ${d.duration_sec}s | Peak AI Prob: ${(d.p_fake_peak * 100).toFixed(1)}%${spkInfo}`;
+      appendLog(`Scanned "${file.name}" -> ${d.verdict} (${(d.p_fake_avg * 100).toFixed(1)}% AI)`);
+      refreshAudit();
+    } catch (err) {
+      alert("Scan failed: " + err.message);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = "Scan Audio (AI vs. Real)";
+    }
+  };
+
+  // 5. SHA-256 Hash-Chained Audit Ledger
+  async function refreshAudit() {
+    try {
+      const res = await fetch("/api/audit");
+      const data = await res.json();
+      const badge = document.getElementById("chainBadge");
+      if (data.integrity.valid) {
+        badge.textContent = `Chain Valid (${data.integrity.total_blocks} blocks)`;
+        badge.style.color = "#34d399";
+      } else {
+        badge.textContent = `TAMPERED at Block #${data.integrity.tampered_block_id}`;
+        badge.style.color = "#fca5a5";
+      }
+      const list = document.getElementById("auditList");
+      list.textContent = data.events.length
+        ? data.events.map(e =>
+            `#${e.id} [${e.timestamp}] caller=${e.speaker_id} | risk=${e.risk_score} | ${e.action} | hash=${e.record_hash.slice(0,14)}...`
+          ).join("\n")
+        : "No alerts logged yet.";
+    } catch (e) {}
+  }
+
+  document.getElementById("verifyBtn").onclick = async () => {
+    await refreshAudit();
+    appendLog("Verified full SHA-256 audit hash chain.");
+  };
+
+  setInterval(refreshAudit, 3000);
+  refreshSpeakers();
+  refreshAudit();
+  // 4b. Live Timed Voice Recorder for Forensic Scanner
+  let recCtx, recStream, recTimerId, recSeconds = 0, recChunks = [];
+
+  function showScanResult(d, label) {
+    const box = document.getElementById("scanResult");
+    const verdict = document.getElementById("scanVerdict");
+    const details = document.getElementById("scanDetails");
+    const score = document.getElementById("scanScore");
+    box.style.display = "flex";
+    const color = d.verdict.includes("AI") ? "#ef4444" : (d.verdict.includes("SUSPICIOUS") ? "#f59e0b" : "#10b981");
+    box.style.borderColor = color;
+    verdict.style.color = color;
+    score.style.color = color;
+    verdict.textContent = d.verdict;
+    score.textContent = `${(d.p_fake_avg * 100).toFixed(1)}% AI`;
+    const spkInfo = d.closest_speaker ? ` | Closest Enrolled: ${d.closest_speaker} (match=${d.speaker_match})` : "";
+    details.textContent = `Duration: ${d.duration_sec}s | Peak AI Prob: ${(d.p_fake_peak * 100).toFixed(1)}%${spkInfo}`;
+    appendLog(`Scanned ${label} -> ${d.verdict} (${(d.p_fake_avg * 100).toFixed(1)}% AI)`);
+    refreshAudit();
+  }
+
+  document.getElementById("recStartBtn").onclick = async () => {
+    try {
+      recChunks = [];
+      recSeconds = 0;
+      const timerEl = document.getElementById("recTimer");
+      timerEl.textContent = "00:00";
+      timerEl.style.color = "#fca5a5";
+
+      recStream = await navigator.mediaDevices.getUserMedia({
+        audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false }
+      });
+      recCtx = new AudioContext({ sampleRate: 16000 });
+      await recCtx.resume();
+      await recCtx.audioWorklet.addModule("/pcm-processor.js");
+      const src = recCtx.createMediaStreamSource(recStream);
+      const node = new AudioWorkletNode(recCtx, "pcm16-processor");
+      node.port.onmessage = (e) => recChunks.push(new Int16Array(e.data));
+      src.connect(node);
+
+      recTimerId = setInterval(() => {
+        recSeconds += 1;
+        const m = String(Math.floor(recSeconds / 60)).padStart(2, "0");
+        const s = String(recSeconds % 60).padStart(2, "0");
+        timerEl.textContent = `${m}:${s}`;
+      }, 1000);
+
+      document.getElementById("recStartBtn").disabled = true;
+      document.getElementById("recStopBtn").disabled = false;
+    } catch (err) {
+      alert("Mic error: " + err.message);
+    }
+  };
+
+  document.getElementById("recStopBtn").onclick = async () => {
+    clearInterval(recTimerId);
+    recCtx?.close();
+    recStream?.getTracks().forEach(t => t.stop());
+
+    const stopBtn = document.getElementById("recStopBtn");
+    const startBtn = document.getElementById("recStartBtn");
+    const timerEl = document.getElementById("recTimer");
+    stopBtn.disabled = true;
+    stopBtn.textContent = "Scanning...";
+    timerEl.style.color = "#93c5fd";
+
+    try {
+      const total = recChunks.reduce((a, b) => a + b.length, 0);
+      const merged = new Int16Array(total);
+      let offset = 0;
+      for (const ch of recChunks) { merged.set(ch, offset); offset += ch.length; }
+
+      const res = await fetch("/api/analyze-pcm", { method: "POST", body: merged.buffer });
+      const d = await res.json();
+      showScanResult(d, `Live Recording (${timerEl.textContent})`);
+    } catch (err) {
+      alert("Scan failed: " + err.message);
+    } finally {
+      stopBtn.textContent = "Stop & Scan";
+      startBtn.disabled = false;
+    }
+  };
+</script>
 </body>
 </html>

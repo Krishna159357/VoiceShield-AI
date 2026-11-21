@@ -9,27 +9,25 @@ class RiskEngine:
 
     def score(self, p_fake: float, s_match: float | None) -> dict:
         if s_match is None:
-            # No enrolled voice yet — calibrate around laptop mic baseline
-            raw_risk = max(0.0, min(100.0, (p_fake - 0.70) / 0.28 * 100.0))
+            raw_risk = p_fake * 100.0
         else:
-            # 1. Strong speaker match + normal mic p_fake (< 0.96) => Genuine Speaker (SAFE)
-            if s_match >= 0.45 and p_fake < 0.96:
-                raw_risk = max(5.0, (1.0 - s_match) * 35.0)
-            # 2. High-confidence AI clone mimicking the enrolled speaker (p_fake >= 0.96)
-            elif p_fake >= 0.96:
+            # 1. AI Deepfake / Cloned Voice detected (even if speaker match is high!)
+            if p_fake >= 0.72:
                 raw_risk = 88.0
-            # 3. Unmatched voice / Impostor (s_match < 0.35)
-            elif s_match < 0.35:
-                raw_risk = 85.0 if p_fake >= 0.80 else 65.0
-            # 4. Borderline match (0.35 - 0.45) => Medium Risk / MFA
+            # 2. Genuine enrolled owner (s_match >= 0.28 and real human voice)
+            elif s_match >= 0.28 and p_fake < 0.60:
+                raw_risk = max(5.0, (0.55 - min(s_match, 0.55)) * 40.0)
+            # 3. Clear impostor / different human voice (s_match < 0.20)
+            elif s_match < 0.20:
+                raw_risk = 82.0
+            # 4. Borderline / noisy speech => Medium or Warn
             else:
-                raw_risk = 62.0
+                raw_risk = 45.0 if p_fake < 0.60 else 65.0
 
         self.history.append(raw_risk)
         smoothed = round(sum(self.history) / len(self.history), 1)
 
-        # Require at least 2 speech windows before hard-blocking (window 1 triggers MFA first)
-        if smoothed >= 80 and len(self.history) >= 2:
+        if smoothed >= 78 and len(self.history) >= 2:
             tier, action = "HIGH", "BLOCK"
         elif smoothed >= 55:
             tier, action = "MEDIUM", "VERIFY_MFA"
