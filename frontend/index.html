@@ -95,7 +95,8 @@
       <h1>VoiceShield AI</h1>
       <p>Team SHRESTH &middot; Real-Time Voice Cloning Detection &amp; Prevention</p>
     </div>
-    <span class="pill">Privacy-First: Embeddings Only</span>
+    <span id="enginePill" class="pill">Privacy-First: Embeddings Only</span>
+    
   </header>
 
   <div class="grid">
@@ -372,6 +373,9 @@
 
     ws.onmessage = (e) => {
       const d = JSON.parse(e.data);
+      if (d.latency_ms) {
+         document.getElementById("enginePill").textContent = `${d.engine || "ONNX INT8"} · ${d.latency_ms} ms`;
+      }
       document.getElementById("mFake").textContent = d.p_fake !== null ? `${(d.p_fake * 100).toFixed(1)}%` : "--";
       document.getElementById("mMatch").textContent = d.speaker_match !== null ? d.speaker_match.toFixed(2) : "N/A";
       document.getElementById("mAction").textContent = d.action;

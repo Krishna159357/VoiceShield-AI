@@ -1,5 +1,6 @@
 import asyncio
 import tempfile
+import time
 from collections import deque
 from pathlib import Path
 import librosa
@@ -132,12 +133,15 @@ async def audio_stream(ws: WebSocket, speaker_id: str = "ceo"):
     async def run_pipeline(window_np: np.ndarray):
         nonlocal is_processing
         try:
+            t_start = time.perf_counter()
             clean_speech, speech_ratio = await asyncio.to_thread(extract_clean_speech, window_np)
             if clean_speech is None:
+                vad_ms = round((time.perf_counter() - t_start) * 1000, 1)
                 await ws.send_json({
                     "is_speech": False, "speech_ratio": speech_ratio, "p_fake": None,
                     "speaker_id": speaker_id, "speaker_match": None,
-                    "risk_score": 0, "risk_tier": "SILENCE", "action": "WAIT"
+                    "risk_score": 0, "risk_tier": "SILENCE", "action": "WAIT",
+                    "latency_ms": vad_ms
                 })
                 return
 
@@ -145,10 +149,12 @@ async def audio_stream(ws: WebSocket, speaker_id: str = "ceo"):
                 asyncio.to_thread(score_deepfake, clean_speech),
                 asyncio.to_thread(verify_speaker, clean_speech, speaker_id),
             )
+            total_ms = round((time.perf_counter() - t_start) * 1000, 1)
             risk = risk_engine.score(df_res["p_fake"], s_match)
             payload = {
                 "is_speech": True, "speech_ratio": speech_ratio,
-                **df_res, "speaker_id": speaker_id, "speaker_match": s_match, **risk
+                **df_res, "speaker_id": speaker_id, "speaker_match": s_match,
+                **risk, "latency_ms": total_ms
             }
 
             if risk["action"] in ("WARN", "VERIFY_MFA", "BLOCK"):
